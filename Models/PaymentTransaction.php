@@ -43,7 +43,9 @@ use Pay\Enums\Status;
  */
 class PaymentTransaction extends BaseModel
 {
-    protected string $table = 'payment_transaction';
+    public const TABLE = 'pay_transaction';
+
+    protected string $table = self::TABLE;
 
     protected array $fillable = [
         'reference',

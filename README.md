@@ -2,7 +2,7 @@
 
 # Pay
 
-The `Pay` package provides a unified, type-safe interface for accepting payments via multiple providers. It leverages Data Transfer Objects (DTOs) for consistency across gateways and the `Money` package for precise monetary calculations, ensuring your financial transactions are always accurate.
+The Pay package provides a unified, type-safe interface for accepting payments via multiple providers. It leverages Data Transfer Objects (DTOs) for consistency across gateways and the `Money` package for precise monetary calculations, ensuring your financial transactions are always accurate.
 
 ## Features
 
@@ -29,7 +29,7 @@ php dock package:install Pay --packages
 This will automatically:
 
 - Publish the configuration to `App/Config/pay.php`.
-- Create the `payment_*` table via migrations.
+- Run the migration for Pay tables.
 - Register the `PayServiceProvider`.
 
 > Ensure your database is configured in `.env` before running the installation command.
@@ -49,7 +49,7 @@ return [
     // Logging settings for the automated PaymentService
     'logging' => [
         'enabled' => true,
-        'table' => 'payment_transaction',
+        'table' => 'pay_transaction',
         'model' => \Pay\Models\PaymentTransaction::class,
     ],
 
@@ -167,43 +167,43 @@ Returned by `verify()`.
 
 ### PaymentService
 
-| Method                                      | Description                                             |
-| :------------------------------------------ | :------------------------------------------------------ |
-| `initialize(PaymentData $d, array $f = [])` | Standardized flow with automated logging and fallbacks. |
-| `verify(string $reference)`                 | Verifies and updates the internal transaction record.   |
+|Method|Description|
+|:---|:---|
+|`initialize(PaymentData $data, array $fallbackDrivers = [])`|Standardized flow with automated logging and fallbacks.|
+|`verify(string $reference)`|Verifies and updates the internal transaction record.|
 
 ### WebhookService
 
-| Method                                    | Description                                                 |
-| :---------------------------------------- | :---------------------------------------------------------- |
-| `handle(string $d, string $p, string $s)` | Processes and validates asynchronous gateway notifications. |
+|Method|Description|
+|:---|:---|
+|`handle(string $driver, string $payload, string $signature)`|Processes and validates asynchronous gateway notifications.|
 
 ### PayAnalytics
 
 **Fluent Filter Methods:**
 
-| Method                       | Description                             |
-| :--------------------------- | :-------------------------------------- |
-| `successful()`               | Filter by successful payments.          |
-| `failed()`                   | Filter by failed payments.              |
-| `pending()`                  | Filter by pending payments.             |
-| `driver(string $name)`       | Filter by payment gateway.              |
-| `between(string $from, $to)` | Filter by date range.                   |
-| `count()`                    | Get count with current filters applied. |
+|Method|Description|
+|:---|:---|
+|`successful()`|Filter by successful payments.|
+|`failed()`|Filter by failed payments.|
+|`pending()`|Filter by pending payments.|
+|`driver(string $name)`|Filter by payment gateway.|
+|`between(string $from, string $to)`|Filter by date range.|
+|`count()`|Get count with current filters applied.|
 
 **Analytics Methods:**
 
-| Method                                     | Description                           |
-| :----------------------------------------- | :------------------------------------ |
-| `getTotalRevenue(?$from, ?$to, $currency)` | Total revenue as `Money` object.      |
-| `getTransactionCount(?$s, ?$d, ?$f, ?$t)`  | Count transactions with filters.      |
-| `getDailyVolume($from, $to, ?$currency)`   | Daily payment stats for charts.       |
-| `getMonthlyVolume($from, $to, ?$currency)` | Monthly payment stats for charts.     |
-| `getRevenueByDriver(?$from, ?$to)`         | Revenue breakdown by payment gateway. |
-| `getTopCustomers($limit, ?$from, ?$to)`    | Highest paying customers.             |
-| `getConversionRate(?$from, ?$to)`          | Success vs failure ratio.             |
-| `getSummary(?$from, ?$to, ?$currency)`     | Comprehensive payment analytics.      |
-| `getAverageTransactionValue(?$from, ?$to)` | Average successful payment amount.    |
+|Method|Description|
+|:---|:---|
+|`getTotalRevenue(?string $from, ?string $to, string $currency)`|Total revenue as `Money` object.|
+|`getTransactionCount(?string $status, ?string $driver, ?string $from, ?string $to)`|Count transactions with filters.|
+|`getDailyVolume(string $from, string $to, ?string $currency)`|Daily payment stats for charts.|
+|`getMonthlyVolume(string $from, string $to, ?string $currency)`|Monthly payment stats for charts.|
+|`getRevenueByDriver(?string $from, ?string $to)`|Revenue breakdown by payment gateway.|
+|`getTopCustomers(int $limit, ?string $from, ?string $to)`|Highest paying customers.|
+|`getConversionRate(?string $from, ?string $to)`|Success vs failure ratio.|
+|`getSummary(?string $from, ?string $to, ?string $currency)`|Comprehensive payment analytics.|
+|`getAverageTransactionValue(?string $from, ?string $to)`|Average successful payment amount.|
 
 ## Advanced Usage
 
@@ -238,17 +238,17 @@ The `logging` configuration controls automatic persistence of payment transactio
 // In pay.php config
 'logging' => [
     'enabled' => true,                                    // Enable/disable logging
-    'table' => 'payment_transaction',                     // Database table name
+    'table' => 'pay_transaction',                         // Database table name
     'model' => \Pay\Models\PaymentTransaction::class,     // Model class to use
 ],
 ```
 
 When you call `PaymentService::initialize()`:
 
-1. A new `PaymentTransaction` record is created with status `PENDING`
-2. The transaction stores: reference, driver, amount (minor units), currency, email, metadata
-3. If the gateway returns a different reference, the record is updated
-4. On verification or webhook, the status is updated to `SUCCESS` or `FAILED`
+- A new `PaymentTransaction` record is created with status `PENDING`
+- The transaction stores: reference, driver, amount (minor units), currency, email, metadata
+- If the gateway returns a different reference, the record is updated
+- On verification or webhook, the status is updated to `SUCCESS` or `FAILED`
 
 #### When to Use
 
@@ -347,7 +347,7 @@ class PaymentWebhookController extends Controller
 
 With Anchor's convention-based routing, place your controller in the appropriate module:
 
-```
+```text
 App/
   Pay/
     Controllers/
@@ -487,7 +487,7 @@ $response = Pay::amount(50)
 
 ## Use Case
 
-#### Complete E-Commerce Checkout Flow
+### Complete E-Commerce Checkout Flow
 
 ```php
 // Step 1: Checkout Controller - Initialize Payment
@@ -607,7 +607,7 @@ $successful = $user->transactions()->successful()->get();
 $pending = $user->transactions()->pending()->get();
 ```
 
-#### How It Works
+#### Implementation Details
 
 When you call `$user->pay()`:
 
@@ -615,7 +615,7 @@ When you call `$user->pay()`:
 - `PaymentService` extracts this info and saves it directly on the transaction record
 - The `transactions()` relationship uses `morphMany()` to query by these columns
 
-> **Why not email?** Email-based linking is fragile, if a user changes their email, the relationship breaks. Polymorphic relationships use immutable IDs, making them production-ready.
+> **Why not email?** Email-based linking is fragile; if a user changes their email, the relationship breaks. Polymorphic relationships use immutable IDs, making them built for stability and scale.
 
 #### Querying Transactions by Payable
 
@@ -674,8 +674,7 @@ use Pay\Exceptions\PaymentException;
 try {
     $response = Pay::amount(100)->email($email)->initialize();
 } catch (PaymentException $e) {
-    // Handle payment error
-    logger()->error('Payment failed: ' . $e->getMessage());
+    Log::error('Payment failed: ' . $e->getMessage());
 }
 ```
 
@@ -817,23 +816,28 @@ php dock pay:verify-pending --dry-run
 | `--driver=paystack` | Filter by specific payment driver                   |
 | `--limit=100`       | Maximum number of transactions to process           |
 | `--dry-run`         | Preview mode - no changes made                      |
-
-**When to Use:**
-
-- As a scheduled cron job (e.g., every hour) to catch missed webhooks
-- After server downtime or maintenance
-- For manual reconciliation when investigating payment issues
-- Before closing financial periods to ensure all payments are settled
-
-**What It Does:**
-
-1. Queries all `PENDING` transactions from the database
-2. Calls `Pay::verify()` for each transaction against its gateway
-3. If verified as **successful** → Updates status, dispatches `PaymentSuccessful` event
-4. If verified as **failed** → Updates status to `FAILED`
-5. If still pending → Leaves unchanged for retry later
-
-> **Tip:** For production, schedule `php dock pay:verify-pending --hours=2` to run every hour via cron. This catches any webhooks that may have been missed.
+ 
+## Automation
+ 
+The Pay package uses automated scheduling to reconcile pending payments that missed their webhooks. This is registered in the framework scheduler:
+ 
+```php
+// packages/Pay/Schedules/PayVerifyPendingPaymentSchedule.php
+namespace Pay\Schedules;
+ 
+use Cron\Interfaces\Schedulable;
+use Cron\Schedule;
+ 
+class PayVerifyPendingPaymentSchedule implements Schedulable
+{
+    public function schedule(Schedule $schedule): void
+    {
+        $schedule->task()
+            ->signature('pay:verify-pending')
+            ->hourly();
+    }
+}
+```
 
 ## Environment Variables
 

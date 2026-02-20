@@ -42,7 +42,7 @@ return [
     */
     'logging' => [
         'enabled' => true,
-        'table' => 'payment_transaction',
+        'table' => 'pay_transaction',
         'model' => Pay\Models\PaymentTransaction::class,
     ],
 

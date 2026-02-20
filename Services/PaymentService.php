@@ -13,6 +13,8 @@ declare(strict_types=1);
 namespace Pay\Services;
 
 use Core\Services\ConfigServiceInterface;
+use Database\Collections\ModelCollection;
+use Helpers\DateTimeHelper;
 use Pay\Contracts\PaymentGatewayInterface;
 use Pay\DataObjects\PaymentData;
 use Pay\DataObjects\PaymentResponse;
@@ -100,5 +102,22 @@ class PaymentService
         } catch (Throwable $e) {
             throw $e;
         }
+    }
+
+    public function getPendingTransactions(int $hours, ?string $driver = null, int $limit = 100): ModelCollection
+    {
+        $cutoff = DateTimeHelper::now()->subHours($hours)->toDateTimeString();
+
+        $query = $this->transactionModel::query()
+            ->where('status', Status::PENDING)
+            ->where('created_at', '>=', $cutoff)
+            ->limit($limit)
+            ->orderBy('created_at', 'ASC');
+
+        if ($driver) {
+            $query->where('driver', $driver);
+        }
+
+        return $query->get();
     }
 }

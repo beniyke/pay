@@ -20,6 +20,8 @@ use Pay\Enums\Status;
 
 class PayAnalyticsService
 {
+    public const TABLE = 'pay_transaction';
+
     protected ?string $statusFilter = null;
 
     protected ?string $driverFilter = null;
@@ -90,7 +92,7 @@ class PayAnalyticsService
 
     public function getTotalRevenue(?string $from = null, ?string $to = null, string $currency = 'NGN'): Money
     {
-        $query = DB::table('payment_transaction')
+        $query = DB::table(self::TABLE)
             ->where('status', Status::SUCCESS->value)
             ->where('currency', $currency);
 
@@ -108,7 +110,7 @@ class PayAnalyticsService
 
     public function getTransactionCount(?string $status = null, ?string $driver = null, ?string $from = null, ?string $to = null): int
     {
-        $query = DB::table('payment_transaction');
+        $query = DB::table(self::TABLE);
 
         if ($status) {
             $query->where('status', $status);
@@ -128,7 +130,7 @@ class PayAnalyticsService
 
     public function getDailyVolume(string $from, string $to, string $currency = 'NGN'): array
     {
-        $query = DB::table('payment_transaction')
+        $query = DB::table(self::TABLE)
             ->select(
                 DB::raw('DATE(created_at) as date'),
                 DB::raw('COUNT(*) as count'),
@@ -161,7 +163,7 @@ class PayAnalyticsService
 
     public function getMonthlyVolume(string $from, string $to, string $currency = 'NGN'): array
     {
-        $query = DB::table('payment_transaction')
+        $query = DB::table(self::TABLE)
             ->select(
                 DB::raw("DATE_FORMAT(created_at, '%Y-%m') as month"),
                 DB::raw('COUNT(*) as count'),
@@ -192,7 +194,7 @@ class PayAnalyticsService
 
     public function getRevenueByDriver(?string $from = null, ?string $to = null, string $currency = 'NGN'): array
     {
-        $query = DB::table('payment_transaction')
+        $query = DB::table(self::TABLE)
             ->select('driver', DB::raw('SUM(amount) as revenue'), DB::raw('COUNT(*) as count'))
             ->where('status', Status::SUCCESS->value)
             ->where('currency', $currency)
@@ -220,7 +222,7 @@ class PayAnalyticsService
 
     public function getTopCustomers(int $limit = 10, ?string $from = null, ?string $to = null, string $currency = 'NGN'): array
     {
-        $query = DB::table('payment_transaction')
+        $query = DB::table(self::TABLE)
             ->select('email', DB::raw('SUM(amount) as total_paid'), DB::raw('COUNT(*) as payment_count'))
             ->where('status', Status::SUCCESS->value)
             ->where('currency', $currency)
@@ -251,7 +253,7 @@ class PayAnalyticsService
      */
     public function getConversionRate(?string $from = null, ?string $to = null): array
     {
-        $query = DB::table('payment_transaction')
+        $query = DB::table(self::TABLE)
             ->select(
                 DB::raw('COUNT(*) as total'),
                 DB::raw("SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as successful"),
@@ -297,7 +299,7 @@ class PayAnalyticsService
 
     public function getAverageTransactionValue(?string $from = null, ?string $to = null): float
     {
-        $query = DB::table('payment_transaction')
+        $query = DB::table(self::TABLE)
             ->where('status', Status::SUCCESS->value);
 
         if ($from) {

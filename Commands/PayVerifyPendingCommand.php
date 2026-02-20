@@ -15,11 +15,8 @@ declare(strict_types=1);
 
 namespace Pay\Commands;
 
-use Helpers\DateTimeHelper;
-use Pay\Enums\Status;
-use Pay\Events\PaymentSuccessfulEvent;
-use Pay\Models\PaymentTransaction;
 use Pay\PayManager;
+use Pay\Services\PaymentService;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\Console\Input\InputInterface;
@@ -30,6 +27,12 @@ use Throwable;
 class PayVerifyPendingCommand extends Command
 {
     protected static $defaultName = 'pay:verify-pending';
+
+    public function __construct(
+        private readonly PaymentService $paymentService
+    ) {
+        parent::__construct();
+    }
 
     protected function configure(): void
     {
@@ -85,21 +88,8 @@ class PayVerifyPendingCommand extends Command
             $output->writeln('');
         }
 
-        // Calculate cutoff time
-        $cutoff = DateTimeHelper::now()->subHours($hours)->toDateTimeString();
-
-        // Query pending transactions
-        $query = PaymentTransaction::query()
-            ->pending()
-            ->where('created_at', '>=', $cutoff)
-            ->limit($limit)
-            ->orderBy('created_at', 'ASC');
-
-        if ($driver) {
-            $query->where('driver', $driver);
-        }
-
-        $transactions = $query->get();
+        // Query pending transactions via service
+        $transactions = $this->paymentService->getPendingTransactions($hours, $driver, $limit);
 
         if ($transactions->count() === 0) {
             $output->writeln('<comment>No pending transactions found.</comment>');
@@ -140,19 +130,12 @@ class PayVerifyPendingCommand extends Command
                     continue;
                 }
 
-                // Verify with the payment gateway
-                $response = $payManager->driver($txDriver)->verify($reference);
+                // Verify via service
+                $response = $this->paymentService->verify($reference);
                 $results['verified']++;
 
-                // Check verification result
-                if ($response->success) {
-                    // Update transaction status
-                    $transaction->status = Status::SUCCESS;
-                    $transaction->save();
-
-                    // Dispatch PaymentSuccessfulEvent event
-                    event(new PaymentSuccessfulEvent($transaction, $response->data ?? []));
-
+                // Check verification result status (Enums\Status)
+                if ($response->status === 'success') {
                     $results['successful']++;
                     $detailedResults[] = [
                         'reference' => $reference,
@@ -160,11 +143,7 @@ class PayVerifyPendingCommand extends Command
                         'amount' => $transaction->amount,
                         'result' => '<info>SUCCESS</info> (event dispatched)',
                     ];
-                } elseif (isset($response->status) && $response->status === 'failed') {
-                    // Mark as failed
-                    $transaction->status = Status::FAILED;
-                    $transaction->save();
-
+                } elseif ($response->status === 'failed') {
                     $results['failed']++;
                     $detailedResults[] = [
                         'reference' => $reference,
